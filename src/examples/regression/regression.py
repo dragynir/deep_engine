@@ -6,12 +6,12 @@ import matplotlib.pyplot as plt
 
 
 from src.engine.core import Value
-from src.engine.nn import Neuron
+from src.engine.nn import Neuron, MLP
 from src.engine.model_selection import kfold
 from src.engine.optim import l2_regularization, SGD
 
 
-def create_dataset(visualize=True):
+def create_poly_dataset(visualize=True):
     X = np.arange(0, 30)
     y = [
         3,
@@ -73,18 +73,16 @@ def visualize_decision(
     plt.show()
 
 
-def create_model(in_features):
-    model = Neuron(in_features, nonlin=False)
-    print(model)
-    print("number of parameters:", len(model.parameters()))
-    return model
-
-
 def create_polynomial_features(X, degree=2):
     features = []
     for d in range(1, degree + 1):
         features.append(np.power(X, d))
     return np.stack(features, axis=-1)
+
+
+def mse_loss(target, pred):
+    losses = [(yi - predi) ** 2 for yi, predi in zip(target, pred)]
+    return sum(losses) * (1.0 / len(losses))
 
 
 def min_max_norm(feature):
@@ -99,11 +97,6 @@ def normalize(X, y):
     X = np.stack(features, axis=-1)
     y = min_max_norm(np.array(y))
     return X, y
-
-
-def mse_loss(target, pred):
-    losses = [(yi - predi) ** 2 for yi, predi in zip(target, pred)]
-    return sum(losses) * (1.0 / len(losses))
 
 
 def preprocess(dataset, n_features):
@@ -161,15 +154,26 @@ def validation(model, dataset, exp_path):
 
 
 if __name__ == "__main__":
-    dataset = create_dataset(visualize=False)
-    poly_degree = 4
+    reg_type = 'poly'  # mlp
+
     cv_splits = 2
     cv = False
     steps = 2000
-    model = create_model(in_features=poly_degree)
-    dataset = preprocess(dataset, n_features=poly_degree)
     experiment_path = "experiment" + ("_cv" if cv else "")
     os.makedirs(experiment_path, exist_ok=True)
+    dataset = None
+    model = None
+
+    if reg_type == 'poly':
+        poly_degree = 4
+        dataset = create_poly_dataset(visualize=False)
+        model = Neuron(poly_degree, nonlin=False)
+        dataset = preprocess(dataset, n_features=poly_degree)
+    elif reg_type == 'mlp':
+        model = MLP(2, [8, 4, 2])
+        dataset = None # TODO simple regression dataset
+    else:
+        raise ValueError()
 
     if cv:
         print('Start cross-validation...')
@@ -177,7 +181,6 @@ if __name__ == "__main__":
         for fold_i, (val_fold, train_fold) in enumerate(
             kfold(dataset, n_splits=cv_splits)
         ):
-
             fold_exp_path = os.path.join(experiment_path, f'fold_{fold_i}')
             os.makedirs(fold_exp_path, exist_ok=True)
 
