@@ -1,3 +1,4 @@
+import os
 from time import sleep
 
 import numpy as np
@@ -45,29 +46,36 @@ def create_dataset(visualize=True):
     ]
     if visualize:
         plt.scatter(X, y)
-        plt.xlabel('X')
-        plt.ylabel('y')
-        plt.savefig('dataset.png')
+        plt.xlabel("X")
+        plt.ylabel("y")
+        plt.savefig("dataset.png")
 
     return np.array(X), np.array(y)
 
 
-def visualize_decision(X, y, pred, feature_to_viz=0, png_name='decision_train'):
+def visualize_decision(
+    X,
+    y,
+    pred,
+    feature_to_viz=0,
+    out_path="",
+    png_name="decision_train",
+):
     X = X[:, feature_to_viz]
-    plt.scatter(X, y, label='target')
-    plt.plot(X, pred, label='pred', color='r')
-    plt.xlabel('X')
-    plt.ylabel('y')
+    plt.scatter(X, y, label="target")
+    plt.plot(X, pred, label="pred", color="r")
+    plt.xlabel("X")
+    plt.ylabel("y")
     plt.title(png_name)
     plt.legend()
-    plt.savefig(f'{png_name}.png')
+    plt.savefig(os.path.join(out_path, f"{png_name}.png"))
     plt.show()
 
 
 def create_model(in_features):
     model = Neuron(in_features, nonlin=False)
     print(model)
-    print('number of parameters:', len(model.parameters()))
+    print("number of parameters:", len(model.parameters()))
     return model
 
 
@@ -107,11 +115,11 @@ def preprocess(dataset, n_features):
 def predict(model, X):
     inputs = [list(map(Value, xrow)) for xrow in X]
     pred = list(map(model, inputs))
-    model.zero_grad() # TODO add eval mode
+    model.zero_grad()  # TODO add eval mode
     return [s.data for s in pred]
 
 
-def train(model, dataset, steps=100):
+def train(model, dataset, exp_path, steps=100):
 
     X, y = dataset
 
@@ -143,18 +151,19 @@ def train(model, dataset, steps=100):
         if k % 100 == 0:
             print(f"step {k} loss {total_loss.data}")
             pred = predict(model, X)
-            visualize_decision(X, y, pred)
+            visualize_decision(X, y, pred, out_path=exp_path)
             sleep(1)
 
-    print('Finish training...')
+    print("Finish training...")
 
 
-def validation(model, dataset):
+def validation(model, dataset, exp_path):
     X, y = dataset
     pred = predict(model, X)
     loss = mse_loss(y, pred)
-    print('Validation mse:', loss)
-    visualize_decision(X, y, pred, png_name='decision_val')
+    print("Validation mse:", loss)
+    visualize_decision(X, y, pred, out_path=exp_path, png_name="decision_val")
+    return {"mse": loss}
 
 
 if __name__ == "__main__":
@@ -165,11 +174,25 @@ if __name__ == "__main__":
     steps = 2000
     model = create_model(in_features=poly_degree)
     dataset = preprocess(dataset, n_features=poly_degree)
-
+    experiment_path = "experiment" + ("_cv" if cv else "")
+    os.makedirs(experiment_path)
 
     if cv:
-        for val_fold, train_fold in kfold(dataset, n_splits=cv_splits):
-            train(model, dataset=train_fold, steps=steps)
+        cv_metrics = []
+        for fold_i, (val_fold, train_fold) in enumerate(
+            kfold(dataset, n_splits=cv_splits)
+        ):
+
+            fold_exp_path = os.path.join(experiment_path, f'fold_{fold_i}')
+            os.makedirs(fold_exp_path, exist_ok=True)
+
+            train(model, dataset=train_fold, exp_path=fold_exp_path, steps=steps)
+            metrics = validation(model, dataset, exp_path=fold_exp_path)
+            print(f"Validation on fold {fold_i}:", metrics)
+            cv_metrics.append(metrics["mse"])
+
+        print("Cv result:", sum(cv_metrics) / len(cv_metrics))
     else:
-        train(model, dataset=dataset, steps=steps)
-        validation(model, dataset)
+        train(model, dataset=dataset, exp_path=experiment_path, steps=steps)
+        metrics = validation(model, dataset, experiment_path)
+        print("Result metrics: ", metrics)
