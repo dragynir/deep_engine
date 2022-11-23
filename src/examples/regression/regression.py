@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from src.engine.core import Value
 from src.engine.nn import Neuron
 from src.engine.model_selection import kfold
+from src.engine.optim import l2_regularization, SGD
 
 
 def create_dataset(visualize=True):
@@ -123,6 +124,9 @@ def train(model, dataset, exp_path, steps=100):
 
     X, y = dataset
 
+    learning_rate = 0.05
+    optimizer = SGD(model.parameters(), momentum=0.9, nesterow=True)
+
     for k in range(steps):
 
         Xb, yb = X, y  # TODO create dataloader
@@ -131,22 +135,12 @@ def train(model, dataset, exp_path, steps=100):
         inputs = [list(map(Value, xrow)) for xrow in Xb]
         pred = list(map(model, inputs))
         loss = mse_loss(yb, pred)
-
-        # l2 regularization # TODO move to package
-        alpha = 1e-4
-        reg_loss = alpha * sum((p * p for p in model.parameters()))
-        total_loss = loss + reg_loss
+        total_loss = loss + l2_regularization(model.parameters(), alpha=1e-4)
 
         # backward
         model.zero_grad()
         total_loss.backward()
-
-        # update weights (sgd) # TODO move
-        start_lr = 0.05
-        decay = 0.01
-        learning_rate = start_lr - decay * k / steps
-        for p in model.parameters():
-            p.data -= learning_rate * p.grad
+        optimizer.step(learning_rate)
 
         if k % 100 == 0:
             print(f"step {k} loss {total_loss.data}")
@@ -170,12 +164,12 @@ if __name__ == "__main__":
     dataset = create_dataset(visualize=False)
     poly_degree = 4
     cv_splits = 2
-    cv = True
+    cv = False
     steps = 2000
     model = create_model(in_features=poly_degree)
     dataset = preprocess(dataset, n_features=poly_degree)
     experiment_path = "experiment" + ("_cv" if cv else "")
-    os.makedirs(experiment_path)
+    os.makedirs(experiment_path, exist_ok=True)
 
     if cv:
         print('Start cross-validation...')
