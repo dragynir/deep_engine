@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 
 from src.engine.core import Value
 from src.engine.nn import Neuron
+from src.engine.model_selection import kfold
 
 
 def create_dataset(visualize=True):
@@ -51,17 +52,15 @@ def create_dataset(visualize=True):
     return np.array(X), np.array(y)
 
 
-def visualize_decision(model, X_origin, X, y):
-    inputs = [list(map(Value, xrow)) for xrow in X]
-    pred = list(map(model, inputs))
-    pred = [s.data for s in pred]
-
-    plt.scatter(X_origin, y, label='target')
-    plt.plot(X_origin, pred, label='pred', color='r')
+def visualize_decision(X, y, pred, feature_to_viz=0, png_name='decision_train'):
+    X = X[:, feature_to_viz]
+    plt.scatter(X, y, label='target')
+    plt.plot(X, pred, label='pred', color='r')
     plt.xlabel('X')
     plt.ylabel('y')
+    plt.title(png_name)
     plt.legend()
-    plt.savefig('decision.png')
+    plt.savefig(f'{png_name}.png')
     plt.show()
 
 
@@ -98,10 +97,23 @@ def mse_loss(target, pred):
     return sum(losses) * (1.0 / len(losses))
 
 
-def train(model, dataset, n_features, steps=100):
+def preprocess(dataset, n_features):
     X_origin, y_origin = dataset
     X = create_polynomial_features(X_origin, degree=n_features)
     X, y = normalize(X, y_origin)
+    return X, y
+
+
+def predict(model, X):
+    inputs = [list(map(Value, xrow)) for xrow in X]
+    pred = list(map(model, inputs))
+    model.zero_grad() # TODO add eval mode
+    return [s.data for s in pred]
+
+
+def train(model, dataset, steps=100):
+
+    X, y = dataset
 
     for k in range(steps):
 
@@ -123,22 +135,41 @@ def train(model, dataset, n_features, steps=100):
 
         # update weights (sgd) # TODO move
         start_lr = 0.05
-        momentum = 0.01
-        learning_rate = start_lr - momentum * k / steps
+        decay = 0.01
+        learning_rate = start_lr - decay * k / steps
         for p in model.parameters():
             p.data -= learning_rate * p.grad
 
         if k % 100 == 0:
             print(f"step {k} loss {total_loss.data}")
-            visualize_decision(model, X_origin, X, y)
-            model.zero_grad()
+            pred = predict(model, X)
+            visualize_decision(X, y, pred)
             sleep(1)
 
     print('Finish training...')
 
 
+def validation(model, dataset):
+    X, y = dataset
+    pred = predict(model, X)
+    loss = mse_loss(y, pred)
+    print('Validation mse:', loss)
+    visualize_decision(X, y, pred, png_name='decision_val')
+
+
 if __name__ == "__main__":
-    X, y = create_dataset(visualize=False)
+    dataset = create_dataset(visualize=False)
     poly_degree = 4
+    cv_splits = 2
+    cv = False
+    steps = 2000
     model = create_model(in_features=poly_degree)
-    train(model, dataset=(X, y), n_features=poly_degree, steps=2000)
+    dataset = preprocess(dataset, n_features=poly_degree)
+
+
+    if cv:
+        for val_fold, train_fold in kfold(dataset, n_splits=cv_splits):
+            train(model, dataset=train_fold, steps=steps)
+    else:
+        train(model, dataset=dataset, steps=steps)
+        validation(model, dataset)
