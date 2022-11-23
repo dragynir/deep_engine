@@ -10,6 +10,7 @@ from src.engine.core import Value
 from src.engine.nn import Neuron, MLP
 from src.engine.model_selection import kfold
 from src.engine.optim import l2_regularization, SGD
+from src.engine.utils import seed_everything
 
 
 def create_poly_dataset():
@@ -49,9 +50,9 @@ def create_poly_dataset():
     return np.array(X), np.array(y)
 
 
-def visualize_dataset(dataset, out_path):
+def visualize_dataset(dataset, out_path, feature=0):
     X, y = dataset
-    plt.scatter(X, y)
+    plt.scatter(X[:, feature], y)
     plt.xlabel("X")
     plt.ylabel("y")
     plt.savefig(os.path.join(out_path, "dataset.png"))
@@ -116,11 +117,10 @@ def predict(model, X):
     return [s.data for s in pred]
 
 
-def train(model, dataset, exp_path, steps=100):
+def train(model, dataset, exp_path, lr=0.05, steps=100):
 
     X, y = dataset
 
-    learning_rate = 0.05
     optimizer = SGD(model.parameters(), momentum=0.9, nesterow=True)
 
     for k in range(steps):
@@ -136,7 +136,7 @@ def train(model, dataset, exp_path, steps=100):
         # backward
         model.zero_grad()
         total_loss.backward()
-        optimizer.step(learning_rate)
+        optimizer.step(lr)
 
         if k % 100 == 0:
             print(f"step {k} loss {total_loss.data}")
@@ -157,16 +157,20 @@ def validation(model, dataset, exp_path):
 
 
 if __name__ == "__main__":
-    reg_type = 'poly'  # mlp, poly
+
+    seed_everything(42)
+
+    reg_type = 'mlp'  # mlp, poly
 
     cv_splits = 2
-    cv = True
+    cv = False
     steps = 2000
+    lr = 0.0001
     experiment_path = f"{reg_type}_experiment" + ("_cv" if cv else "")
     os.makedirs(experiment_path, exist_ok=True)
     dataset = None
     model = None
-
+    # TODO std normalization
     if reg_type == 'poly':
         poly_degree = 4
         dataset = create_poly_dataset()
@@ -174,8 +178,11 @@ if __name__ == "__main__":
         model = Neuron(poly_degree, nonlin=False)
         dataset = preprocess(dataset, n_features=poly_degree)
     elif reg_type == 'mlp':
-        model = MLP(2, [8, 4, 2])
-        X, y = make_regression(n_samples=100, n_features=2, noise=10)
+        n_features = 1
+        model = MLP(n_features, [2, 2, 1])
+        dataset = make_regression(n_samples=50, n_features=n_features, noise=5)
+        visualize_dataset(dataset, experiment_path)
+        X, y = dataset
         dataset = normalize(X, y)
     else:
         raise ValueError()
@@ -189,13 +196,13 @@ if __name__ == "__main__":
             fold_exp_path = os.path.join(experiment_path, f'fold_{fold_i}')
             os.makedirs(fold_exp_path, exist_ok=True)
 
-            train(model, dataset=train_fold, exp_path=fold_exp_path, steps=steps)
+            train(model, dataset=train_fold, exp_path=fold_exp_path, lr=lr, steps=steps)
             metrics = validation(model, dataset, exp_path=fold_exp_path)
             print(f"Validation on fold {fold_i}:", metrics)
             cv_metrics.append(metrics["mse"])
 
         print("Cv result:", sum(cv_metrics) / len(cv_metrics))
     else:
-        train(model, dataset=dataset, exp_path=experiment_path, steps=steps)
+        train(model, dataset=dataset, exp_path=experiment_path, lr=lr, steps=steps)
         metrics = validation(model, dataset, experiment_path)
         print("Result metrics: ", metrics)
