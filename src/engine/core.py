@@ -1,3 +1,5 @@
+# inspired by https://github.com/karpathy/micrograd
+
 class Value:
     def __init__(self, data, _children=(), _op=""):
         self.data = data
