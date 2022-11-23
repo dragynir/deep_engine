@@ -22,6 +22,3 @@ def kfold(dataset: Tuple[np.ndarray, np.ndarray], n_splits):
         other = np.take(X, other_ind, axis=0), np.take(y, other_ind, axis=0)
         yield fold, other
         current = stop
-
-
-# def cross_validation(model, ):

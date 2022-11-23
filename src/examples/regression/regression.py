@@ -170,7 +170,7 @@ if __name__ == "__main__":
     dataset = create_dataset(visualize=False)
     poly_degree = 4
     cv_splits = 2
-    cv = False
+    cv = True
     steps = 2000
     model = create_model(in_features=poly_degree)
     dataset = preprocess(dataset, n_features=poly_degree)
@@ -178,6 +178,7 @@ if __name__ == "__main__":
     os.makedirs(experiment_path)
 
     if cv:
+        print('Start cross-validation...')
         cv_metrics = []
         for fold_i, (val_fold, train_fold) in enumerate(
             kfold(dataset, n_splits=cv_splits)
