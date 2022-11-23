@@ -4,6 +4,7 @@ from time import sleep
 import numpy as np
 import matplotlib.pyplot as plt
 
+from sklearn.datasets import make_regression
 
 from src.engine.core import Value
 from src.engine.nn import Neuron, MLP
@@ -11,7 +12,7 @@ from src.engine.model_selection import kfold
 from src.engine.optim import l2_regularization, SGD
 
 
-def create_poly_dataset(visualize=True):
+def create_poly_dataset():
     X = np.arange(0, 30)
     y = [
         3,
@@ -45,13 +46,15 @@ def create_poly_dataset(visualize=True):
         169,
         179,
     ]
-    if visualize:
-        plt.scatter(X, y)
-        plt.xlabel("X")
-        plt.ylabel("y")
-        plt.savefig("dataset.png")
-
     return np.array(X), np.array(y)
+
+
+def visualize_dataset(dataset, out_path):
+    X, y = dataset
+    plt.scatter(X, y)
+    plt.xlabel("X")
+    plt.ylabel("y")
+    plt.savefig(os.path.join(out_path, "dataset.png"))
 
 
 def visualize_decision(
@@ -154,24 +157,26 @@ def validation(model, dataset, exp_path):
 
 
 if __name__ == "__main__":
-    reg_type = 'poly'  # mlp
+    reg_type = 'poly'  # mlp, poly
 
     cv_splits = 2
-    cv = False
+    cv = True
     steps = 2000
-    experiment_path = "experiment" + ("_cv" if cv else "")
+    experiment_path = f"{reg_type}_experiment" + ("_cv" if cv else "")
     os.makedirs(experiment_path, exist_ok=True)
     dataset = None
     model = None
 
     if reg_type == 'poly':
         poly_degree = 4
-        dataset = create_poly_dataset(visualize=False)
+        dataset = create_poly_dataset()
+        visualize_dataset(dataset, experiment_path)
         model = Neuron(poly_degree, nonlin=False)
         dataset = preprocess(dataset, n_features=poly_degree)
     elif reg_type == 'mlp':
         model = MLP(2, [8, 4, 2])
-        dataset = None # TODO simple regression dataset
+        X, y = make_regression(n_samples=100, n_features=2, noise=10)
+        dataset = normalize(X, y)
     else:
         raise ValueError()
 
