@@ -1,3 +1,5 @@
+from time import sleep
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -6,7 +8,7 @@ from src.engine.core import Value
 from src.engine.nn import Neuron
 
 
-def create_dataset():
+def create_dataset(visualize=True):
     X = np.arange(0, 30)
     y = [
         3,
@@ -40,10 +42,11 @@ def create_dataset():
         169,
         179,
     ]
-    plt.scatter(X, y)
-    plt.xlabel('X')
-    plt.ylabel('y')
-    plt.savefig('dataset.png')
+    if visualize:
+        plt.scatter(X, y)
+        plt.xlabel('X')
+        plt.ylabel('y')
+        plt.savefig('dataset.png')
 
     return np.array(X), np.array(y)
 
@@ -51,18 +54,19 @@ def create_dataset():
 def visualize_decision(model, X_origin, X, y):
     inputs = [list(map(Value, xrow)) for xrow in X]
     pred = list(map(model, inputs))
-    pred = [s.data > 0 for s in pred]
+    pred = [s.data for s in pred]
 
     plt.scatter(X_origin, y, label='target')
-    plt.scatter(X_origin, pred, label='pred')
+    plt.plot(X_origin, pred, label='pred', color='r')
     plt.xlabel('X')
     plt.ylabel('y')
     plt.legend()
     plt.savefig('decision.png')
+    plt.show()
 
 
-def create_model():
-    model = Neuron(2, nonlin=False)
+def create_model(in_features):
+    model = Neuron(in_features, nonlin=False)
     print(model)
     print('number of parameters:', len(model.parameters()))
     return model
@@ -80,11 +84,13 @@ def min_max_norm(feature):
     return (feature - min_v) / (max_v - min_v + 1e-16)
 
 
-def normalize(X):
+def normalize(X, y):
     features = []
     for i in range(X.shape[1]):
         features.append(min_max_norm(X[:, i]))
-    return np.stack(features, axis=-1)
+    X = np.stack(features, axis=-1)
+    y = min_max_norm(np.array(y))
+    return X, y
 
 
 def mse_loss(target, pred):
@@ -92,10 +98,10 @@ def mse_loss(target, pred):
     return sum(losses) * (1.0 / len(losses))
 
 
-def train(model, dataset, steps=100):
-    X_origin, y = dataset
-    X = create_polynomial_features(X_origin)
-    X = normalize(X)
+def train(model, dataset, n_features, steps=100):
+    X_origin, y_origin = dataset
+    X = create_polynomial_features(X_origin, degree=n_features)
+    X, y = normalize(X, y_origin)
 
     for k in range(steps):
 
@@ -116,19 +122,23 @@ def train(model, dataset, steps=100):
         total_loss.backward()
 
         # update weights (sgd) # TODO move
-        learning_rate = 0.0001  #  1.0 - 0.9 * k / 100
+        start_lr = 0.05
+        momentum = 0.01
+        learning_rate = start_lr - momentum * k / steps
         for p in model.parameters():
             p.data -= learning_rate * p.grad
 
-        if k % 5 == 0:
+        if k % 100 == 0:
             print(f"step {k} loss {total_loss.data}")
+            visualize_decision(model, X_origin, X, y)
+            model.zero_grad()
+            sleep(1)
 
-    visualize_decision(model, X_origin, X, y)
     print('Finish training...')
 
 
 if __name__ == "__main__":
-    X, y = create_dataset()
-    model = create_model()
-    train(model, dataset=(X, y), steps=400)
-
+    X, y = create_dataset(visualize=False)
+    poly_degree = 4
+    model = create_model(in_features=poly_degree)
+    train(model, dataset=(X, y), n_features=poly_degree, steps=2000)

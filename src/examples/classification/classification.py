@@ -79,7 +79,7 @@ def train(model, dataset, steps=100):
         total_loss.backward()
 
         # update weights (sgd) # TODO move
-        learning_rate = 1.0 - 0.9 * k / 100
+        learning_rate = 1.0 - 0.9 * k / steps
         for p in model.parameters():
             p.data -= learning_rate * p.grad
 
