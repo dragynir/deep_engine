@@ -43,5 +43,9 @@ class SGD:
             p.data = w
 
 
+def l1_regularization(parameters, alpha=1e-4) -> Value:
+    return alpha * sum(abs(p) for p in parameters)
+
+
 def l2_regularization(parameters, alpha=1e-4) -> Value:
     return alpha * sum((p * p for p in parameters))
