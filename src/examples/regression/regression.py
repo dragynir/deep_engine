@@ -65,10 +65,15 @@ def visualize_decision(
     feature_to_viz=0,
     out_path="",
     png_name="decision_train",
+    decision_as_line=True,
 ):
     X = X[:, feature_to_viz]
     plt.scatter(X, y, label="target")
-    plt.plot(X, pred, label="pred", color="r")
+    if decision_as_line:
+        plt.plot(X, pred, label="pred", color="r")
+    else:
+        plt.scatter(X, pred, label="pred", color="r")
+
     plt.xlabel("X")
     plt.ylabel("y")
     plt.title(png_name)
@@ -94,12 +99,17 @@ def min_max_norm(feature):
     return (feature - min_v) / (max_v - min_v + 1e-16)
 
 
-def normalize(X, y):
+def std_norm(feature):
+    std, mean = feature.std(), feature.mean()
+    return (feature - mean) / (std + 1e-16)
+
+
+def normalize(X, y, x_norm_func=min_max_norm, y_norm_func=min_max_norm):
     features = []
     for i in range(X.shape[1]):
-        features.append(min_max_norm(X[:, i]))
+        features.append(x_norm_func(X[:, i]))
     X = np.stack(features, axis=-1)
-    y = min_max_norm(np.array(y))
+    y = y_norm_func(np.array(y))
     return X, y
 
 
@@ -117,15 +127,27 @@ def predict(model, X):
     return [s.data for s in pred]
 
 
-def train(model, dataset, exp_path, lr=0.05, steps=100):
+def train(
+    model,
+    dataset,
+    exp_path,
+    lr=0.05,
+    steps=100,
+    batch_size=None,
+    decision_as_line=False,
+):
 
     X, y = dataset
 
-    optimizer = SGD(model.parameters(), momentum=0.9, nesterow=True)
+    optimizer = SGD(model.parameters(), momentum=0.9)
 
     for k in range(steps):
 
-        Xb, yb = X, y  # TODO create dataloader
+        if batch_size is None:
+            Xb, yb = X, y
+        else:
+            indices = np.random.permutation(X.shape[0])[:batch_size]
+            Xb, yb = X[indices], y[indices]
 
         # forward
         inputs = [list(map(Value, xrow)) for xrow in Xb]
@@ -141,18 +163,31 @@ def train(model, dataset, exp_path, lr=0.05, steps=100):
         if k % 100 == 0:
             print(f"step {k} loss {total_loss.data}")
             pred = predict(model, X)
-            visualize_decision(X, y, pred, out_path=exp_path)
+            visualize_decision(
+                X,
+                y,
+                pred,
+                out_path=exp_path,
+                decision_as_line=decision_as_line,
+            )
             sleep(1)
 
     print("Finish training...")
 
 
-def validation(model, dataset, exp_path):
+def validation(model, dataset, exp_path, decision_as_line):
     X, y = dataset
     pred = predict(model, X)
     loss = mse_loss(y, pred)
     print("Validation mse:", loss)
-    visualize_decision(X, y, pred, out_path=exp_path, png_name="decision_val")
+    visualize_decision(
+        X,
+        y,
+        pred,
+        out_path=exp_path,
+        png_name="decision_val",
+        decision_as_line=decision_as_line,
+    )
     return {"mse": loss}
 
 
@@ -160,49 +195,87 @@ if __name__ == "__main__":
 
     seed_everything(42)
 
-    reg_type = 'mlp'  # mlp, poly
+    reg_type = "mlp"  # mlp, poly
 
+    decision_as_line = False
     cv_splits = 2
+    batch_size = 16
     cv = False
-    steps = 2000
-    lr = 0.0001
+    steps = 1000
+    lr = 0.001
     experiment_path = f"{reg_type}_experiment" + ("_cv" if cv else "")
     os.makedirs(experiment_path, exist_ok=True)
     dataset = None
     model = None
-    # TODO std normalization
-    if reg_type == 'poly':
+    if reg_type == "poly":
         poly_degree = 4
         dataset = create_poly_dataset()
         visualize_dataset(dataset, experiment_path)
-        model = Neuron(poly_degree, nonlin=False)
+        model = Neuron(poly_degree)
         dataset = preprocess(dataset, n_features=poly_degree)
-    elif reg_type == 'mlp':
+    elif reg_type == "mlp":
         n_features = 1
-        model = MLP(n_features, [2, 2, 1])
-        dataset = make_regression(n_samples=50, n_features=n_features, noise=5)
+        model = MLP(
+            n_features,
+            nouts=[1, 1, 1],  # [2, 2, 1]
+            # activations=["sigmoid", "sigmoid", None],
+            activations=["sigmoid", "sigmoid", None],
+        )
+        model = Neuron(1)
+        dataset = make_regression(
+            n_samples=50,
+            n_features=n_features,
+            noise=5,
+            shuffle=True,
+        )
         visualize_dataset(dataset, experiment_path)
         X, y = dataset
-        dataset = normalize(X, y)
+        dataset = normalize(X, y, x_norm_func=std_norm)
     else:
         raise ValueError()
 
     if cv:
-        print('Start cross-validation...')
+        print("Start cross-validation...")
         cv_metrics = []
         for fold_i, (val_fold, train_fold) in enumerate(
             kfold(dataset, n_splits=cv_splits)
         ):
-            fold_exp_path = os.path.join(experiment_path, f'fold_{fold_i}')
+            fold_exp_path = os.path.join(experiment_path, f"fold_{fold_i}")
             os.makedirs(fold_exp_path, exist_ok=True)
 
-            train(model, dataset=train_fold, exp_path=fold_exp_path, lr=lr, steps=steps)
-            metrics = validation(model, dataset, exp_path=fold_exp_path)
+            train(
+                model,
+                dataset=train_fold,
+                exp_path=fold_exp_path,
+                lr=lr,
+                batch_size=batch_size,
+                steps=steps,
+                decision_as_line=decision_as_line,
+            )
+            metrics = validation(
+                model,
+                dataset,
+                exp_path=fold_exp_path,
+                decision_as_line=decision_as_line,
+            )
             print(f"Validation on fold {fold_i}:", metrics)
             cv_metrics.append(metrics["mse"])
 
         print("Cv result:", sum(cv_metrics) / len(cv_metrics))
     else:
-        train(model, dataset=dataset, exp_path=experiment_path, lr=lr, steps=steps)
-        metrics = validation(model, dataset, experiment_path)
+        train(
+            model,
+            dataset=dataset,
+            exp_path=experiment_path,
+            lr=lr,
+            batch_size=batch_size,
+            steps=steps,
+            decision_as_line=decision_as_line,
+        )
+        metrics = validation(
+            model,
+            dataset,
+            experiment_path,
+            decision_as_line=decision_as_line,
+        )
         print("Result metrics: ", metrics)

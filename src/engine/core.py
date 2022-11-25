@@ -1,4 +1,6 @@
 # inspired by https://github.com/karpathy/micrograd
+import numpy as np
+
 
 class Value:
     def __init__(self, data, _children=(), _op=""):
@@ -55,6 +57,22 @@ class Value:
 
         out._backward = _backward
 
+        return out
+
+    def _stable_sigmoid(self, x):
+        if x >= 0:
+            return 1 / (1 + np.exp(-x))
+        x_exp = np.exp(x)
+        return x_exp / (1.0 + x_exp)
+
+    def sigmoid(self):
+        out = Value(self._stable_sigmoid(self.data), (self,), "Sigmoid")
+
+        def _backward():
+            sigm = self._stable_sigmoid(out.data)
+            self.grad += sigm * (1 - sigm) * out.grad
+
+        out._backwards = _backward
         return out
 
     def backward(self):

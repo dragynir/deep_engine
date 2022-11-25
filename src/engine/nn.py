@@ -12,20 +12,20 @@ class Module:
 
 
 class Neuron(Module):
-    def __init__(self, nin, nonlin=True):
+    def __init__(self, nin, activation=None):
         self.w = [Value(random.uniform(-1, 1)) for _ in range(nin)]
         self.b = Value(0)
-        self.nonlin = nonlin
+        self.activation = activation
 
     def __call__(self, x):
         act = sum((wi * xi for wi, xi in zip(self.w, x)), self.b)
-        return act.relu() if self.nonlin else act
+        return act if self.activation is None else getattr(act, self.activation)()
 
     def parameters(self):
         return self.w + [self.b]
 
     def __repr__(self):
-        return f"{'ReLU' if self.nonlin else 'Linear'}Neuron({len(self.w)})"
+        return f"{'Linear' if self.activation is None else self.activation}Neuron({len(self.w)})"
 
 
 class Layer(Module):
@@ -44,10 +44,17 @@ class Layer(Module):
 
 
 class MLP(Module):
-    def __init__(self, nin, nouts):
+    def __init__(self, nin, nouts, activations=None):
+        if activations is not None:
+            assert len(nouts) == len(activations)
+
         sz = [nin] + nouts
         self.layers = [
-            Layer(sz[i], sz[i + 1], nonlin=i != len(nouts) - 1)
+            Layer(
+                sz[i],
+                sz[i + 1],
+                activation=None if activations is None else activations[i],
+            )
             for i in range(len(nouts))
         ]
 
