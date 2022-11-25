@@ -33,7 +33,19 @@ class Value:
             other.grad += self.data * out.grad
 
         out._backward = _backward
+        return out
 
+    def __abs__(self):
+        out = Value(abs(self.data), (self,), "abs")
+
+        def _backward():
+            if out.data == 0:
+                g = 0
+            else:
+                g = out.data / abs(out.data)
+            self.grad += g * out.grad
+
+        out._backward = _backward
         return out
 
     def __pow__(self, other):

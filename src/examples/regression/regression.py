@@ -9,7 +9,7 @@ from sklearn.datasets import make_regression
 from src.engine.core import Value
 from src.engine.nn import Neuron, MLP
 from src.engine.model_selection import kfold
-from src.engine.optim import l2_regularization, SGD
+from src.engine.optim import l2_regularization, l1_regularization, SGD
 from src.engine.utils import seed_everything
 
 
@@ -134,6 +134,7 @@ def train(
     lr=0.05,
     steps=100,
     batch_size=None,
+    regularizatioin_func=l2_regularization,
     decision_as_line=False,
 ):
 
@@ -153,7 +154,7 @@ def train(
         inputs = [list(map(Value, xrow)) for xrow in Xb]
         pred = list(map(model, inputs))
         loss = mse_loss(yb, pred)
-        total_loss = loss + l2_regularization(model.parameters(), alpha=1e-4)
+        total_loss = loss + regularizatioin_func(model.parameters(), alpha=1e-4)
 
         # backward
         model.zero_grad()
@@ -196,17 +197,19 @@ if __name__ == "__main__":
     seed_everything(42)
 
     reg_type = "mlp"  # mlp, poly
-
     decision_as_line = False
     cv_splits = 2
     batch_size = 16
     cv = False
     steps = 2000
     lr = 0.01
+    regularizatioin_func = l2_regularization
     experiment_path = f"{reg_type}_experiment" + ("_cv" if cv else "")
     os.makedirs(experiment_path, exist_ok=True)
+
     dataset = None
     model = None
+
     if reg_type == "poly":
         poly_degree = 4
         dataset = create_poly_dataset()
@@ -217,13 +220,14 @@ if __name__ == "__main__":
         n_features = 1
         model = MLP(
             n_features,
-            nouts=[2, 1],  # [2, 2, 1]
-            # activations=["relu", "relu", None],
-            activations=['tanh', None],  # relu, sigmoid, tanh
+            nouts=[2, 2, 1],  # [2, 2, 1]
+            # activations=['relu', 'relu', None],  # relu, sigmoid, tanh
+            # activations=['sigmoid', 'sigmoid', None],  # relu, sigmoid, tanh
+            activations=['tanh', 'tanh', None],
             initializer='xavier',  # xavier, he
         )
 
-        # [-1, 1] - веса, то с relu градиенты затухнут
+        # [-1, 1] - веса, то с relu градиенты затухнут для -
         # model = Neuron(1)
         dataset = make_regression(
             n_samples=50,
@@ -233,7 +237,7 @@ if __name__ == "__main__":
         )
         # visualize_dataset(dataset, experiment_path)
         X, y = dataset
-        dataset = normalize(X, y, x_norm_func=min_max_norm)
+        dataset = normalize(X, y, x_norm_func=std_norm)
     else:
         raise ValueError()
 
@@ -254,6 +258,7 @@ if __name__ == "__main__":
                 batch_size=batch_size,
                 steps=steps,
                 decision_as_line=decision_as_line,
+                regularizatioin_func=regularizatioin_func,
             )
             metrics = validation(
                 model,
@@ -274,6 +279,7 @@ if __name__ == "__main__":
             batch_size=batch_size,
             steps=steps,
             decision_as_line=decision_as_line,
+            regularizatioin_func=regularizatioin_func,
         )
         metrics = validation(
             model,
