@@ -18,6 +18,8 @@ class Neuron(Module):
         self.activation = activation
 
     def __call__(self, x):
+        if isinstance(x, Value):
+            x = [x]
         act = sum((wi * xi for wi, xi in zip(self.w, x)), self.b)
         return act if self.activation is None else getattr(act, self.activation)()
 

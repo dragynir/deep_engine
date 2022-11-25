@@ -170,7 +170,7 @@ def train(
                 out_path=exp_path,
                 decision_as_line=decision_as_line,
             )
-            sleep(1)
+            # sleep(1)
 
     print("Finish training...")
 
@@ -210,16 +210,16 @@ if __name__ == "__main__":
     if reg_type == "poly":
         poly_degree = 4
         dataset = create_poly_dataset()
-        visualize_dataset(dataset, experiment_path)
+        # visualize_dataset(dataset, experiment_path)
         model = Neuron(poly_degree)
         dataset = preprocess(dataset, n_features=poly_degree)
     elif reg_type == "mlp":
         n_features = 1
         model = MLP(
             n_features,
-            nouts=[1, 1, 1],  # [2, 2, 1]
+            nouts=[1, 1],  # [2, 2, 1]
             # activations=["sigmoid", "sigmoid", None],
-            activations=["sigmoid", "sigmoid", None],
+            activations=['relu', None],
         )
         model = Neuron(1)
         dataset = make_regression(
@@ -228,9 +228,9 @@ if __name__ == "__main__":
             noise=5,
             shuffle=True,
         )
-        visualize_dataset(dataset, experiment_path)
+        # visualize_dataset(dataset, experiment_path)
         X, y = dataset
-        dataset = normalize(X, y, x_norm_func=std_norm)
+        dataset = normalize(X, y, x_norm_func=min_max_norm)
     else:
         raise ValueError()
 
