@@ -200,7 +200,7 @@ if __name__ == "__main__":
     decision_as_line = False
     cv_splits = 2
     batch_size = 16
-    cv = True
+    cv = False
     steps = 2000
     lr = 0.01
     regularizatioin_func = l2_regularization
@@ -222,9 +222,9 @@ if __name__ == "__main__":
             n_features,
             nouts=[2, 2, 1],  # [2, 2, 1]
             # activations=['relu', 'relu', None],  # relu, sigmoid, tanh
-            # activations=['sigmoid', 'sigmoid', None],  # relu, sigmoid, tanh
-            activations=['tanh', 'tanh', None],
-            initializer='xavier',  # xavier, he
+            activations=['sigmoid', 'sigmoid', None],  # relu, sigmoid, tanh
+            # activations=['tanh', 'tanh', None],
+            initializer='xavier',  # xavier, he, None
         )
 
         # [-1, 1] - веса, то с relu градиенты затухнут для -

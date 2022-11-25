@@ -4,7 +4,7 @@ from sklearn.datasets import make_moons
 
 
 from src.engine.core import Value
-from src.engine.nn import MLP
+from src.engine.nn import MLP, Neuron
 from src.engine.utils import seed_everything
 
 
@@ -12,8 +12,7 @@ def visualize_decision(model):
     h = 0.25
     x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
     y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
-    xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
-                         np.arange(y_min, y_max, h))
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
     Xmesh = np.c_[xx.ravel(), yy.ravel()]
     inputs = [list(map(Value, xrow)) for xrow in Xmesh]
     scores = list(map(model, inputs))
@@ -25,7 +24,8 @@ def visualize_decision(model):
     plt.scatter(X[:, 0], X[:, 1], c=y, s=40, cmap=plt.cm.Spectral)
     plt.xlim(xx.min(), xx.max())
     plt.ylim(yy.min(), yy.max())
-    plt.savefig('decision.png')
+    plt.savefig("decision.png")
+    plt.show()
 
 
 def create_dataset():
@@ -38,21 +38,19 @@ def create_dataset():
 
 
 def max_margin_loss(target, pred):
-    losses = [(1 + -yi*predi).relu() for yi, predi in zip(target, pred)]
+    """Hinge loss"""
+    losses = [(1 + -yi * predi).relu() for yi, predi in zip(target, pred)]
     loss = sum(losses) * (1.0 / len(losses))
     return loss
+
+
+# def binary_cross_entropy(target, pred):
+
 
 
 def accuracy(target, pred):
     acc = [(yi > 0) == (predi.data > 0) for yi, predi in zip(target, pred)]
     return sum(acc) / len(acc)
-
-
-def create_model():
-    model = MLP(2, [16, 16, 1])  # 2-layer neural network
-    print(model)
-    print("number of parameters", len(model.parameters()))
-    return model
 
 
 def train(model, dataset, steps=100):
@@ -61,7 +59,7 @@ def train(model, dataset, steps=100):
 
     for k in range(steps):
 
-        Xb, yb = X, y # TODO create dataloader
+        Xb, yb = X, y  # TODO create dataloader
 
         # forward
         inputs = [list(map(Value, xrow)) for xrow in Xb]
@@ -86,13 +84,24 @@ def train(model, dataset, steps=100):
         if k % 5 == 0:
             print(f"step {k} loss {total_loss.data}, accuracy {acc * 100}%")
 
-    print('Finish training...')
+    print("Finish training...")
 
 
 if __name__ == "__main__":
 
     seed_everything(42)
     X, y = create_dataset()
-    model = create_model()
-    train(model, dataset=(X, y), steps=100)
+
+    model = MLP(
+        2,
+        nouts=[8, 8, 1],
+        activations=['sigmoid', 'sigmoid', 'tanh'],
+        initializer='xavier',  # xavier, he
+    )
+    # model = Neuron(2)
+
+    print(model)
+    print("number of parameters", len(model.parameters()))
+
+    train(model, dataset=(X, y), steps=30)
     visualize_decision(model)

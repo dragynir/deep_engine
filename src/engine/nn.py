@@ -16,7 +16,7 @@ class Module:
 
 class Neuron(Module):
     def __init__(self, nin, w=None, activation=None):
-        self.w = [Value(random.uniform(-1, 1)) for _ in range(nin)] if w is None else [Value(w)]
+        self.w = [Value(random.uniform(-1, 1) if w is None else w) for _ in range(nin)]
         self.b = Value(0)
         self.activation = activation
 
