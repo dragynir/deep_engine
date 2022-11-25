@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.datasets import make_moons
-
+from sklearn.datasets import make_moons, make_blobs, make_classification
 
 from src.engine.core import Value
 from src.engine.nn import MLP, Neuron
@@ -28,12 +27,30 @@ def visualize_decision(model):
     plt.show()
 
 
-def create_dataset():
-    X, y = make_moons(n_samples=100, noise=0.1)
-    y = y * 2 - 1
+def plot_dataset(X, y):
     plt.figure(figsize=(5, 5))
     plt.scatter(X[:, 0], X[:, 1], c=y, s=20, cmap="jet")
     plt.savefig("data.png")
+
+
+def create_moons_dataset():
+    X, y = make_moons(n_samples=100, noise=0.1)
+    y = y * 2 - 1
+    plot_dataset(X, y)
+    return X, y
+
+
+def create_blobs_dataset(centers=2):
+    X, y = make_blobs(n_features=2, centers=centers)
+    y = y * 2 - 1
+    plot_dataset(X, y)
+    return X, y
+
+
+def create_classification_dataset(n_informative=2):
+    X, y = make_classification(n_features=2, n_redundant=0, n_informative=2)
+    y = y * 2 - 1
+    plot_dataset(X, y)
     return X, y
 
 
@@ -44,8 +61,10 @@ def max_margin_loss(target, pred):
     return loss
 
 
-# def binary_cross_entropy(target, pred):
-
+def binary_cross_entropy(target, pred):
+    losses = [yi * predi.log() + (1 - yi) * (1 - predi).log() for yi, predi in zip(target, pred)]
+    loss = sum(losses) * (1.0 / len(losses))
+    return loss
 
 
 def accuracy(target, pred):
@@ -59,15 +78,15 @@ def train(model, dataset, steps=100):
 
     for k in range(steps):
 
-        Xb, yb = X, y  # TODO create dataloader
+        Xb, yb = X, y
 
         # forward
         inputs = [list(map(Value, xrow)) for xrow in Xb]
         pred = list(map(model, inputs))
         loss = max_margin_loss(yb, pred)
+        # loss = binary_cross_entropy(yb, pred)
         acc = accuracy(yb, pred)
 
-        # l2 regularization # TODO move to package
         alpha = 1e-4
         reg_loss = alpha * sum((p * p for p in model.parameters()))
         total_loss = loss + reg_loss
@@ -76,7 +95,6 @@ def train(model, dataset, steps=100):
         model.zero_grad()
         total_loss.backward()
 
-        # update weights (sgd) # TODO move
         learning_rate = 1.0 - 0.9 * k / steps
         for p in model.parameters():
             p.data -= learning_rate * p.grad
@@ -90,18 +108,22 @@ def train(model, dataset, steps=100):
 if __name__ == "__main__":
 
     seed_everything(42)
-    X, y = create_dataset()
+    # X, y = create_moons_dataset()
+    # X, y = create_blobs_dataset()
+    X, y = create_classification_dataset()
 
-    model = MLP(
-        2,
-        nouts=[8, 8, 1],
-        activations=['sigmoid', 'sigmoid', 'tanh'],
-        initializer='xavier',  # xavier, he
-    )
-    # model = Neuron(2)
+    # model = MLP(
+    #     2,
+    #     nouts=[8, 8, 1],
+    #     activations=['sigmoid', 'sigmoid', 'tanh'],
+    #     initializer=None,  # xavier, he
+    # )
+
+    model = Neuron(2)
+    # model = Neuron(2, activation='sigmoid')
 
     print(model)
     print("number of parameters", len(model.parameters()))
 
-    train(model, dataset=(X, y), steps=30)
+    train(model, dataset=(X, y), steps=500)
     visualize_decision(model)

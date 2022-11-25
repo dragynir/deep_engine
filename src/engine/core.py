@@ -35,6 +35,14 @@ class Value:
         out._backward = _backward
         return out
 
+    def log(self):
+        out = Value(np.log(self.data), (self,), "log")
+
+        def _backward():
+            self.grad += 1.0 / (out.data + 1e-16) * out.grad
+        out._backward = _backward
+        return out
+
     def __abs__(self):
         out = Value(abs(self.data), (self,), "abs")
 
