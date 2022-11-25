@@ -201,8 +201,8 @@ if __name__ == "__main__":
     cv_splits = 2
     batch_size = 16
     cv = False
-    steps = 1000
-    lr = 0.001
+    steps = 2000
+    lr = 0.01
     experiment_path = f"{reg_type}_experiment" + ("_cv" if cv else "")
     os.makedirs(experiment_path, exist_ok=True)
     dataset = None
@@ -217,11 +217,14 @@ if __name__ == "__main__":
         n_features = 1
         model = MLP(
             n_features,
-            nouts=[1, 1],  # [2, 2, 1]
-            # activations=["sigmoid", "sigmoid", None],
-            activations=['relu', None],
+            nouts=[2, 1],  # [2, 2, 1]
+            # activations=["relu", "relu", None],
+            activations=['tanh', None],  # relu, sigmoid, tanh
+            initializer='xavier',  # xavier, he
         )
-        model = Neuron(1)
+
+        # [-1, 1] - веса, то с relu градиенты затухнут
+        # model = Neuron(1)
         dataset = make_regression(
             n_samples=50,
             n_features=n_features,

@@ -1,4 +1,7 @@
 import random
+
+import numpy as np
+
 from src.engine.core import Value
 
 
@@ -12,8 +15,8 @@ class Module:
 
 
 class Neuron(Module):
-    def __init__(self, nin, activation=None):
-        self.w = [Value(random.uniform(-1, 1)) for _ in range(nin)]
+    def __init__(self, nin, w=None, activation=None):
+        self.w = [Value(random.uniform(-1, 1)) for _ in range(nin)] if w is None else [Value(w)]
         self.b = Value(0)
         self.activation = activation
 
@@ -31,8 +34,16 @@ class Neuron(Module):
 
 
 class Layer(Module):
-    def __init__(self, nin, nout, **kwargs):
-        self.neurons = [Neuron(nin, **kwargs) for _ in range(nout)]
+    def __init__(self, nin, nout, initializer, **kwargs):
+
+        w = None
+        if initializer == 'xavier':  # symmetric functions
+            range_w = np.sqrt(6 / (nin + nout))
+            w = random.uniform(-range_w, range_w)
+        elif initializer == 'he':  # rule etc.
+            w = random.uniform(0, 2/nin)
+
+        self.neurons = [Neuron(nin, w=w, **kwargs) for _ in range(nout)]
 
     def __call__(self, x):
         out = [n(x) for n in self.neurons]
@@ -46,7 +57,7 @@ class Layer(Module):
 
 
 class MLP(Module):
-    def __init__(self, nin, nouts, activations=None):
+    def __init__(self, nin, nouts, activations=None, initializer=None):
         if activations is not None:
             assert len(nouts) == len(activations)
 
@@ -56,6 +67,7 @@ class MLP(Module):
                 sz[i],
                 sz[i + 1],
                 activation=None if activations is None else activations[i],
+                initializer=initializer,
             )
             for i in range(len(nouts))
         ]

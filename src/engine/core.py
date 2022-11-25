@@ -61,7 +61,7 @@ class Value:
 
     def _stable_sigmoid(self, x):
         if x >= 0:
-            return 1 / (1 + np.exp(-x))
+            return 1.0 / (1.0 + np.exp(-x))
         x_exp = np.exp(x)
         return x_exp / (1.0 + x_exp)
 
@@ -70,9 +70,18 @@ class Value:
 
         def _backward():
             sigm = self._stable_sigmoid(out.data)
-            self.grad += sigm * (1 - sigm) * out.grad
+            self.grad += (sigm * (1.0 - sigm) * out.grad)
 
-        out._backwards = _backward
+        out._backward = _backward
+        return out
+
+    def tanh(self):
+        out = Value(np.tanh(self.data), (self,), "Tanh")
+
+        def _backward():
+            self.grad += (1.0 - np.tanh(out.data) ** 2) * out.grad
+
+        out._backward = _backward
         return out
 
     def backward(self):
