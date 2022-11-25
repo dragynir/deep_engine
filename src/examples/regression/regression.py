@@ -200,7 +200,7 @@ if __name__ == "__main__":
     decision_as_line = False
     cv_splits = 2
     batch_size = 16
-    cv = False
+    cv = True
     steps = 2000
     lr = 0.01
     regularizatioin_func = l2_regularization
