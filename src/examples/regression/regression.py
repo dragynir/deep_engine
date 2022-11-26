@@ -1,4 +1,6 @@
+import json
 import os
+from collections import OrderedDict
 from time import sleep
 
 import numpy as np
@@ -135,6 +137,7 @@ def train(
     steps=100,
     batch_size=None,
     regularizatioin_func=l2_regularization,
+    reg_alpha=1e-4,
     decision_as_line=False,
 ):
 
@@ -154,7 +157,7 @@ def train(
         inputs = [list(map(Value, xrow)) for xrow in Xb]
         pred = list(map(model, inputs))
         loss = mse_loss(yb, pred)
-        total_loss = loss + regularizatioin_func(model.parameters(), alpha=1e-4)
+        total_loss = loss + regularizatioin_func(model.parameters(), alpha=reg_alpha)
 
         # backward
         model.zero_grad()
@@ -196,95 +199,124 @@ if __name__ == "__main__":
 
     seed_everything(42)
 
-    reg_type = "mlp"  # mlp, poly
+    reg_type = "poly"  # mlp, poly
     decision_as_line = False
     cv_splits = 2
     batch_size = 16
-    cv = False
-    steps = 2000
+    cv = True
+    steps = 1000
     lr = 0.01
     regularizatioin_func = l2_regularization
-    experiment_path = f"{reg_type}_experiment" + ("_cv" if cv else "")
-    os.makedirs(experiment_path, exist_ok=True)
+    root_path = f"{reg_type}_experiment" + ("_cv" if cv else "")
+    os.makedirs(root_path, exist_ok=True)
 
     dataset = None
     model = None
 
-    if reg_type == "poly":
-        poly_degree = 4
-        dataset = create_poly_dataset()
-        # visualize_dataset(dataset, experiment_path)
-        model = Neuron(poly_degree)
-        dataset = preprocess(dataset, n_features=poly_degree)
-    elif reg_type == "mlp":
-        n_features = 1
-        model = MLP(
-            n_features,
-            nouts=[2, 2, 1],  # [2, 2, 1]
-            # activations=['relu', 'relu', None],  # relu, sigmoid, tanh
-            activations=['sigmoid', 'sigmoid', None],  # relu, sigmoid, tanh
-            # activations=['tanh', 'tanh', None],
-            initializer='xavier',  # xavier, he, None
-        )
+    # search_greed = OrderedDict({"poly_degree": [4], "alpha": [1e-4]})
+    search_greed = OrderedDict({"poly_degree": [1, 2, 4], "alpha": [0.01, 0.1, 1]})
+    used_params = []
+    experiments_count = 4
 
-        # [-1, 1] - веса, то с relu градиенты затухнут для -
-        # model = Neuron(1)
-        dataset = make_regression(
-            n_samples=50,
-            n_features=n_features,
-            noise=5,
-            shuffle=True,
-        )
-        # visualize_dataset(dataset, experiment_path)
-        X, y = dataset
-        dataset = normalize(X, y, x_norm_func=std_norm)
-    else:
-        raise ValueError()
+    while experiments_count > 0:
+        params_hash = []
+        hyper_params = dict()
+        for key, values in search_greed.items():
+            ind = np.random.randint(len(values))
+            hyper_params[key] = values[ind]
+            params_hash.append(ind)
+        params_hash = tuple(params_hash)
 
-    if cv:
-        print("Start cross-validation...")
-        cv_metrics = []
-        for fold_i, (val_fold, train_fold) in enumerate(
-            kfold(dataset, n_splits=cv_splits)
-        ):
-            fold_exp_path = os.path.join(experiment_path, f"fold_{fold_i}")
-            os.makedirs(fold_exp_path, exist_ok=True)
+        if params_hash in used_params:
+            continue
+        used_params.append(params_hash)
+        experiments_count -= 1
 
+        experiment_path = os.path.join(root_path, f"exp_{experiments_count}")
+        os.makedirs(experiment_path, exist_ok=True)
+
+        with open(os.path.join(experiment_path, 'config.json'), 'w') as outfile:
+            json.dump(hyper_params, outfile)
+
+        print('Use hyper params:', hyper_params, "===========================================")
+
+        if reg_type == "poly":
+            poly_degree = hyper_params["poly_degree"]
+            dataset = create_poly_dataset()
+            # visualize_dataset(dataset, experiment_path)
+            model = Neuron(poly_degree)
+            dataset = preprocess(dataset, n_features=poly_degree)
+        elif reg_type == "mlp":
+            n_features = 1
+            model = MLP(
+                n_features,
+                nouts=[2, 2, 1],  # [2, 2, 1]
+                # activations=['relu', 'relu', None],  # relu, sigmoid, tanh
+                activations=["sigmoid", "sigmoid", None],  # relu, sigmoid, tanh
+                # activations=['tanh', 'tanh', None],
+                initializer="xavier",  # xavier, he, None
+            )
+
+            # [-1, 1] - веса, то с relu градиенты затухнут для -
+            # model = Neuron(1)
+            dataset = make_regression(
+                n_samples=50,
+                n_features=n_features,
+                noise=5,
+                shuffle=True,
+            )
+            # visualize_dataset(dataset, experiment_path)
+            X, y = dataset
+            dataset = normalize(X, y, x_norm_func=std_norm)
+        else:
+            raise ValueError()
+
+        if cv:
+            print("Start cross-validation...")
+            cv_metrics = []
+            for fold_i, (val_fold, train_fold) in enumerate(
+                kfold(dataset, n_splits=cv_splits)
+            ):
+                fold_exp_path = os.path.join(experiment_path, f"fold_{fold_i}")
+                os.makedirs(fold_exp_path, exist_ok=True)
+
+                train(
+                    model,
+                    dataset=train_fold,
+                    exp_path=fold_exp_path,
+                    lr=lr,
+                    batch_size=batch_size,
+                    steps=steps,
+                    decision_as_line=decision_as_line,
+                    regularizatioin_func=regularizatioin_func,
+                    reg_alpha=hyper_params['alpha'],
+                )
+                metrics = validation(
+                    model,
+                    dataset,
+                    exp_path=fold_exp_path,
+                    decision_as_line=decision_as_line,
+                )
+                print(f"Validation on fold {fold_i}:", metrics)
+                cv_metrics.append(metrics["mse"])
+
+            print("Cv result:", sum(cv_metrics) / len(cv_metrics))
+        else:
             train(
                 model,
-                dataset=train_fold,
-                exp_path=fold_exp_path,
+                dataset=dataset,
+                exp_path=experiment_path,
                 lr=lr,
                 batch_size=batch_size,
                 steps=steps,
                 decision_as_line=decision_as_line,
                 regularizatioin_func=regularizatioin_func,
+                reg_alpha=hyper_params['alpha'],
             )
             metrics = validation(
                 model,
                 dataset,
-                exp_path=fold_exp_path,
+                experiment_path,
                 decision_as_line=decision_as_line,
             )
-            print(f"Validation on fold {fold_i}:", metrics)
-            cv_metrics.append(metrics["mse"])
-
-        print("Cv result:", sum(cv_metrics) / len(cv_metrics))
-    else:
-        train(
-            model,
-            dataset=dataset,
-            exp_path=experiment_path,
-            lr=lr,
-            batch_size=batch_size,
-            steps=steps,
-            decision_as_line=decision_as_line,
-            regularizatioin_func=regularizatioin_func,
-        )
-        metrics = validation(
-            model,
-            dataset,
-            experiment_path,
-            decision_as_line=decision_as_line,
-        )
-        print("Result metrics: ", metrics)
+            print("Result metrics: ", metrics)
