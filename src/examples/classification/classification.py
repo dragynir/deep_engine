@@ -108,22 +108,22 @@ def train(model, dataset, steps=100):
 if __name__ == "__main__":
 
     seed_everything(42)
-    # X, y = create_moons_dataset()
+    X, y = create_moons_dataset()
     # X, y = create_blobs_dataset()
-    X, y = create_classification_dataset()
+    # X, y = create_classification_dataset()
 
-    # model = MLP(
-    #     2,
-    #     nouts=[8, 8, 1],
-    #     activations=['sigmoid', 'sigmoid', 'tanh'],
-    #     initializer=None,  # xavier, he
-    # )
+    model = MLP(
+        2,
+        nouts=[8, 8, 2, 1],
+        activations=['relu', 'relu', 'relu', 'tanh'],
+        initializer='he',  # xavier, he
+    )
 
-    model = Neuron(2)
+    # model = Neuron(2)
     # model = Neuron(2, activation='sigmoid')
 
     print(model)
     print("number of parameters", len(model.parameters()))
 
-    train(model, dataset=(X, y), steps=500)
+    train(model, dataset=(X, y), steps=50)
     visualize_decision(model)

@@ -1,5 +1,5 @@
-# inspired by https://github.com/karpathy/micrograd
 import numpy as np
+
 
 
 class Value:
@@ -7,10 +7,9 @@ class Value:
         self.data = data
         self.grad = 0
         self.optim_state = {}
-        # internal variables used for autograd graph construction
         self._backward = lambda: None
         self._prev = set(_children)
-        self._op = _op  # the op that produced this node, for graphviz / debugging / etc
+        self._op = _op
 
     def __add__(self, other):
         other = other if isinstance(other, Value) else Value(other)
@@ -59,7 +58,7 @@ class Value:
     def __pow__(self, other):
         assert isinstance(
             other, (int, float)
-        ), "only supporting int/float powers for now"
+        ), "int and float supported only"
         out = Value(self.data ** other, (self,), f"**{other}")
 
         def _backward():
@@ -105,11 +104,10 @@ class Value:
         return out
 
     def backward(self):
-
-        # topological order all of the children in the graph
         topo = []
         visited = set()
 
+        # topological sort
         def build_topo(v):
             if v not in visited:
                 visited.add(v)
@@ -119,7 +117,6 @@ class Value:
 
         build_topo(self)
 
-        # go one variable at a time and apply the chain rule to get its gradient
         self.grad = 1
         for v in reversed(topo):
             v._backward()

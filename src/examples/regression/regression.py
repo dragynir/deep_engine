@@ -52,6 +52,22 @@ def create_poly_dataset():
     return np.array(X), np.array(y)
 
 
+def create_custom_datasets(dataset_name="cos"):
+    """Cos, poly, sin"""
+
+    X = np.linspace(0, 1, 100)
+
+    if dataset_name == "cos":
+        y = np.cos(2 * np.pi * X)
+    elif dataset_name == "sin":
+        y = np.sin(2 * np.pi * X)
+    elif dataset_name == "poly":
+        y = 5 * X ** 3 + X ** 2 + 5
+    else:
+        raise ValueError()
+    return X[..., None], y
+
+
 def visualize_dataset(dataset, out_path, feature=0):
     X, y = dataset
     plt.scatter(X[:, feature], y)
@@ -199,12 +215,12 @@ if __name__ == "__main__":
 
     seed_everything(42)
 
-    reg_type = "poly"  # mlp, poly
+    reg_type = "mlp"  # mlp, poly
     decision_as_line = False
     cv_splits = 2
-    batch_size = 16
-    cv = True
-    steps = 1000
+    batch_size = 32
+    cv = False
+    steps = 5000
     lr = 0.01
     regularizatioin_func = l2_regularization
     root_path = f"{reg_type}_experiment" + ("_cv" if cv else "")
@@ -213,8 +229,8 @@ if __name__ == "__main__":
     dataset = None
     model = None
 
-    # search_greed = OrderedDict({"poly_degree": [4], "alpha": [1e-4]})
-    search_greed = OrderedDict({"poly_degree": [1, 2, 4], "alpha": [0.01, 0.1, 1]})
+    search_greed = OrderedDict({"poly_degree": [4], "alpha": [1e-4]})
+    # search_greed = OrderedDict({"poly_degree": [1, 2, 4], "alpha": [0.01, 0.1, 1]})
     used_params = []
     experiments_count = 4
 
@@ -235,10 +251,14 @@ if __name__ == "__main__":
         experiment_path = os.path.join(root_path, f"exp_{experiments_count}")
         os.makedirs(experiment_path, exist_ok=True)
 
-        with open(os.path.join(experiment_path, 'config.json'), 'w') as outfile:
+        with open(os.path.join(experiment_path, "config.json"), "w") as outfile:
             json.dump(hyper_params, outfile)
 
-        print('Use hyper params:', hyper_params, "===========================================")
+        print(
+            "Use hyper params:",
+            hyper_params,
+            "===========================================",
+        )
 
         if reg_type == "poly":
             poly_degree = hyper_params["poly_degree"]
@@ -250,21 +270,25 @@ if __name__ == "__main__":
             n_features = 1
             model = MLP(
                 n_features,
-                nouts=[2, 2, 1],  # [2, 2, 1]
+                nouts=[3, 2, 1],  # [2, 2, 1]
                 # activations=['relu', 'relu', None],  # relu, sigmoid, tanh
-                activations=["sigmoid", "sigmoid", None],  # relu, sigmoid, tanh
+                # activations=["sigmoid", "sigmoid", None],  # relu, sigmoid, tanh
+                activations=["tanh", "tanh", None],  # relu, sigmoid, tanh
                 # activations=['tanh', 'tanh', None],
-                initializer="xavier",  # xavier, he, None
+                initializer='xavier',  # xavier, he, None
             )
 
             # [-1, 1] - веса, то с relu градиенты затухнут для -
             # model = Neuron(1)
-            dataset = make_regression(
-                n_samples=50,
-                n_features=n_features,
-                noise=5,
-                shuffle=True,
-            )
+            # dataset = make_regression(
+            #     n_samples=50,
+            #     n_features=n_features,
+            #     noise=5,
+            #     shuffle=True,
+            # )
+
+            dataset = create_custom_datasets(dataset_name='sin')
+
             # visualize_dataset(dataset, experiment_path)
             X, y = dataset
             dataset = normalize(X, y, x_norm_func=std_norm)
@@ -289,7 +313,7 @@ if __name__ == "__main__":
                     steps=steps,
                     decision_as_line=decision_as_line,
                     regularizatioin_func=regularizatioin_func,
-                    reg_alpha=hyper_params['alpha'],
+                    reg_alpha=hyper_params["alpha"],
                 )
                 metrics = validation(
                     model,
@@ -311,7 +335,7 @@ if __name__ == "__main__":
                 steps=steps,
                 decision_as_line=decision_as_line,
                 regularizatioin_func=regularizatioin_func,
-                reg_alpha=hyper_params['alpha'],
+                reg_alpha=hyper_params["alpha"],
             )
             metrics = validation(
                 model,
