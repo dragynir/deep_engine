@@ -1,12 +1,6 @@
-import json
-import os
-from collections import OrderedDict
-from time import sleep
-
 import numpy as np
 import matplotlib.pyplot as plt
 
-from sklearn.datasets import make_regression
 from tqdm import tqdm
 
 from src.engine.model_selection import kfold
@@ -15,18 +9,25 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
+VIS_LINE = True
+
+
 def visualize_decision(X, y, pred, name, params=''):
-    plt.scatter(X, y)
-    plt.scatter(X, pred)
+    if VIS_LINE:
+        plt.plot(X, y)
+        plt.plot(X, pred)
+    else:
+        plt.scatter(X, y)
+        plt.scatter(X, pred)
     plt.xlabel("X")
     plt.ylabel("y")
     plt.title(name + params)
     plt.show()
 
 
-def create_custom_datasets(dataset_name="cos", noise_level=0.0, noise_type='uniform'):
+def create_custom_datasets(dataset_name="cos", dots=100, noise_level=0.0, noise_type='uniform'):
     """Cos, poly, sin"""
-    X = np.linspace(0, 1, 100)
+    X = np.linspace(0, 1, dots)
 
     if dataset_name == "cos":
         y = np.cos(2 * np.pi * X)
@@ -56,7 +57,7 @@ def create_polynomial_features(X, degree=2):
     return np.stack(features, axis=-1)
 
 
-class PolyNetwork():
+class PolyNetwork:
 
     def __init__(self, n_features):
         self.weights = np.random.uniform(-1, 1, n_features + 1)
@@ -86,19 +87,26 @@ class PolyNetwork():
 if __name__ == '__main__':
 
     # n_elements x 1
-    # X_origin, y = create_custom_datasets(dataset_name='sin')
-    # X_origin, y = create_custom_datasets(dataset_name='sin', noise_level=0.2, noise_type='uniform')
-    X_origin, y = create_custom_datasets(dataset_name='sin', noise_level=0.2, noise_type='normal')
+    # X_origin, y = create_custom_datasets(dataset_name='poly', dots=100)
+    # X_origin, y = create_custom_datasets(dataset_name='sin', dots=100)
+    # X_origin, y = create_custom_datasets(dataset_name='sin', dots=100, noise_level=0.2, noise_type='uniform')
+    X_full_origin, y_full = create_custom_datasets(dataset_name='sin', dots=100, noise_level=0.2, noise_type='normal')
 
-    calc_mode = False
+    dots_to_fit = 40
+    # sample some dots
+    indices = np.random.permutation(X_full_origin.shape[0])[:dots_to_fit]
+    indices = sorted(indices)
+    X_origin, y = X_full_origin[indices], y_full[indices]
+
+    calc_mode = True
     cross_val_mode = False
     cv_splits = 4
     visualize_steps = False
-    poly_grid = [1, 2, 4]
-    alpha_grid = [0, 0.01, 0.5]
+    # poly_grid = [1, 2, 4]
+    # alpha_grid = [0, 0.01, 0.5]
 
-    # poly_grid = [3]
-    # alpha_grid = [0.0]
+    poly_grid = [4]
+    alpha_grid = [0.0]
 
     for poly_degree in poly_grid:
         for alpha in alpha_grid:
@@ -107,27 +115,28 @@ if __name__ == '__main__':
 
             # n_elements x n_features
             X = create_polynomial_features(X_origin, degree=poly_degree)
+            X_full = create_polynomial_features(X_full_origin, degree=poly_degree)
             n_features = X.shape[-1]
-            n_elements = X.shape[0]
 
             # add bias ones term
-            X = np.concatenate([X, np.ones(n_elements)[..., None]], axis=-1)
+            X = np.concatenate([X, np.ones(X.shape[0])[..., None]], axis=-1)
+            X_full = np.concatenate([X_full, np.ones(X_full.shape[0])[..., None]], axis=-1)
             model = PolyNetwork(n_features=n_features)
 
             if calc_mode:
                 # init
-                pred = model.forward(X)
-                visualize_decision(X_origin, y, pred, name='init')
+                pred = model.forward(X_full)
+                visualize_decision(X_full_origin, y_full, pred, name='init')
 
                 # calc weights
                 model.calc_weights(X, y)
-                pred = model.forward(X)
-                visualize_decision(X_origin, y, pred, name='calc_weights')
+                pred = model.forward(X_full)
+                visualize_decision(X_full_origin, y_full, pred, name='calc_weights')
 
                 # calc weights
                 model.calc_weights(X, y, alpha=alpha)
-                pred = model.forward(X)
-                visualize_decision(X_origin, y, pred, name='calc_weights_reg')
+                pred = model.forward(X_full)
+                visualize_decision(X_full_origin, y_full, pred, name='calc_weights_reg')
             else:
 
                 if cross_val_mode:
@@ -140,10 +149,9 @@ if __name__ == '__main__':
                         visualize_decision(X_fold[:, 0], y_fold, y_fold, name='fold_data')
                         model.optimize(X_origin, X_fold, y_fold, steps=20000, lr=0.005, alpha=alpha, vis=False)
 
-                        pred = model.forward(X)
-                        visualize_decision(X_origin, y, pred, name='optimize')
-
+                        pred = model.forward(X_full)
+                        visualize_decision(X_full_origin, y_full, pred, name='optimize')
                 else:
                     model.optimize(X_origin, X, y, steps=20000, lr=0.005, alpha=alpha, vis=visualize_steps)
-                    pred = model.forward(X)
-                    visualize_decision(X_origin, y, pred, name='optimize', params=params)
+                    pred = model.forward(X_full)
+                    visualize_decision(X_full_origin, y_full, pred, name='optimize', params=params)
