@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 from sklearn.datasets import make_regression
 from tqdm import tqdm
 
+from src.engine.model_selection import kfold
+
 
 def visualize_decision(X, y, pred, name):
     plt.scatter(X, y)
@@ -19,7 +21,7 @@ def visualize_decision(X, y, pred, name):
     plt.show()
 
 
-def create_custom_datasets(dataset_name="cos"):
+def create_custom_datasets(dataset_name="cos", noise_level=0.0, noise_type='uniform'):
     """Cos, poly, sin"""
     X = np.linspace(0, 1, 100)
 
@@ -31,6 +33,16 @@ def create_custom_datasets(dataset_name="cos"):
         y = 5 * X ** 3 + X ** 2 + 5
     else:
         raise ValueError()
+
+    if noise_type == 'uniform':
+        noise = np.random.uniform(-noise_level, noise_level, y.shape)
+    elif noise_type == 'normal':
+        noise = np.random.normal(0, noise_level, y.shape)
+    else:
+        raise ValueError()
+
+    y+=noise
+
     return X, y
 
 
@@ -55,14 +67,14 @@ class PolyNetwork():
         x_t += alpha * np.ones(x_t.shape)
         self.weights = np.linalg.inv(x_t) @ X.T @ y
 
-    def optimize(self, X_origin, X, y, steps=4, lr=0.01, alpha=0.0):
+    def optimize(self, X_origin, X, y, steps=4, lr=0.01, alpha=0.0, vis=True):
         plot_every = steps // 5 if steps > 5 else 1
 
         for step in tqdm(range(steps)):
             w_grad = 2 * X.T @ (X @ self.weights - y) + 2 * alpha * self.weights
             self.weights -= lr * w_grad
 
-            if step % plot_every == 0:
+            if vis and step % plot_every == 0:
                 pred = self.forward(X)
                 visualize_decision(X_origin, y, pred, name='optimize')
         print('Finish')
@@ -71,7 +83,10 @@ class PolyNetwork():
 if __name__ == '__main__':
 
     # n_elements x 1
-    X_origin, y = create_custom_datasets(dataset_name='sin')
+    # X_origin, y = create_custom_datasets(dataset_name='sin')
+    # X_origin, y = create_custom_datasets(dataset_name='sin', noise_level=0.2, noise_type='uniform')
+    X_origin, y = create_custom_datasets(dataset_name='sin', noise_level=0.2, noise_type='normal')
+
     # n_elements x n_features
     X = create_polynomial_features(X_origin, degree=3)
     n_features = X.shape[-1]
@@ -83,6 +98,8 @@ if __name__ == '__main__':
     model = PolyNetwork(n_features=n_features)
 
     calc_mode = False
+    cross_val_mode = False
+    cv_splits = 4
 
     if calc_mode:
         # init
@@ -99,4 +116,19 @@ if __name__ == '__main__':
         pred = model.forward(X)
         visualize_decision(X_origin, y, pred, name='calc_weights_reg')
     else:
-        model.optimize(X_origin, X, y, steps=20000, lr=0.005, alpha=0.0)
+
+        if cross_val_mode:
+            for fold_i, (val_fold, train_fold) in enumerate(
+                    kfold((X, y), n_splits=cv_splits)
+            ):
+                model = PolyNetwork(n_features=n_features)
+                print('Fold index:', fold_i)
+                X_fold, y_fold = train_fold
+                visualize_decision(X_fold[:, 0], y_fold, y_fold, name='fold_data')
+                model.optimize(X_origin, X_fold, y_fold, steps=20000, lr=0.005, alpha=0.0, vis=False)
+
+                pred = model.forward(X)
+                visualize_decision(X_origin, y, pred, name='optimize')
+
+        else:
+            model.optimize(X_origin, X, y, steps=20000, lr=0.005, alpha=0.0)
