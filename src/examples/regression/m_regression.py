@@ -7,13 +7,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from sklearn.datasets import make_regression
+from tqdm import tqdm
 
 
-def visualize_decision(X, y, pred, feature=0):
+def visualize_decision(X, y, pred, name):
     plt.scatter(X, y)
     plt.scatter(X, pred)
     plt.xlabel("X")
     plt.ylabel("y")
+    plt.title(name)
     plt.show()
 
 
@@ -48,17 +50,26 @@ class PolyNetwork():
     def forward(self, X):
         return X @ self.weights
 
-    def calc_weights(self, X, y):
-        self.weights = np.linalg.inv(X.T @ X) @ X.T @ y
+    def calc_weights(self, X, y, alpha=0.0):
+        x_t = X.T @ X
+        x_t += alpha * np.ones(x_t.shape)
+        self.weights = np.linalg.inv(x_t) @ X.T @ y
 
-    def optimize(self, X, steps, lr=0.01):
-        pass
+    def optimize(self, X_origin, X, y, steps=4, lr=0.01, alpha=0.0):
+        for step in tqdm(range(steps)):
+            w_grad = 2 * X.T @ (X @ self.weights - y) + 2 * alpha * self.weights
+            self.weights -= lr * w_grad
+
+            if step % 20 == 0:
+                pred = self.forward(X)
+                visualize_decision(X_origin, y, pred, name='optimize')
+        print('Finish')
 
 
 if __name__ == '__main__':
 
     # n_elements x 1
-    X_origin, y = create_custom_datasets()
+    X_origin, y = create_custom_datasets(dataset_name='poly')
     # n_elements x n_features
     X = create_polynomial_features(X_origin, degree=5)
     n_features = X.shape[-1]
@@ -69,11 +80,21 @@ if __name__ == '__main__':
 
     model = PolyNetwork(n_features=n_features)
 
-    # init
-    pred = model.forward(X)
-    visualize_decision(X_origin, y, pred)
+    calc_mode = False
 
-    # calc weights
-    model.calc_weights(X, y)
-    pred = model.forward(X)
-    visualize_decision(X_origin, y, pred)
+    if calc_mode:
+        # init
+        pred = model.forward(X)
+        visualize_decision(X_origin, y, pred, name='init')
+
+        # calc weights
+        model.calc_weights(X, y)
+        pred = model.forward(X)
+        visualize_decision(X_origin, y, pred, name='calc_weights')
+
+        # calc weights
+        model.calc_weights(X, y, alpha=0.5)
+        pred = model.forward(X)
+        visualize_decision(X_origin, y, pred, name='calc_weights_reg')
+    else:
+        model.optimize(X_origin, X, y, steps=100, lr=0.0001, alpha=0.0)
