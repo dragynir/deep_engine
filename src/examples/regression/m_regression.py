@@ -56,11 +56,13 @@ class PolyNetwork():
         self.weights = np.linalg.inv(x_t) @ X.T @ y
 
     def optimize(self, X_origin, X, y, steps=4, lr=0.01, alpha=0.0):
+        plot_every = steps // 5 if steps > 5 else 1
+
         for step in tqdm(range(steps)):
             w_grad = 2 * X.T @ (X @ self.weights - y) + 2 * alpha * self.weights
             self.weights -= lr * w_grad
 
-            if step % 20 == 0:
+            if step % plot_every == 0:
                 pred = self.forward(X)
                 visualize_decision(X_origin, y, pred, name='optimize')
         print('Finish')
@@ -69,9 +71,9 @@ class PolyNetwork():
 if __name__ == '__main__':
 
     # n_elements x 1
-    X_origin, y = create_custom_datasets(dataset_name='poly')
+    X_origin, y = create_custom_datasets(dataset_name='sin')
     # n_elements x n_features
-    X = create_polynomial_features(X_origin, degree=5)
+    X = create_polynomial_features(X_origin, degree=3)
     n_features = X.shape[-1]
     n_elements = X.shape[0]
 
@@ -97,4 +99,4 @@ if __name__ == '__main__':
         pred = model.forward(X)
         visualize_decision(X_origin, y, pred, name='calc_weights_reg')
     else:
-        model.optimize(X_origin, X, y, steps=100, lr=0.0001, alpha=0.0)
+        model.optimize(X_origin, X, y, steps=20000, lr=0.005, alpha=0.0)
