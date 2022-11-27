@@ -11,13 +11,16 @@ from tqdm import tqdm
 
 from src.engine.model_selection import kfold
 
+import warnings
+warnings.filterwarnings("ignore")
 
-def visualize_decision(X, y, pred, name):
+
+def visualize_decision(X, y, pred, name, params=''):
     plt.scatter(X, y)
     plt.scatter(X, pred)
     plt.xlabel("X")
     plt.ylabel("y")
-    plt.title(name)
+    plt.title(name + params)
     plt.show()
 
 
@@ -87,48 +90,60 @@ if __name__ == '__main__':
     # X_origin, y = create_custom_datasets(dataset_name='sin', noise_level=0.2, noise_type='uniform')
     X_origin, y = create_custom_datasets(dataset_name='sin', noise_level=0.2, noise_type='normal')
 
-    # n_elements x n_features
-    X = create_polynomial_features(X_origin, degree=3)
-    n_features = X.shape[-1]
-    n_elements = X.shape[0]
-
-    # add bias ones term
-    X = np.concatenate([X, np.ones(n_elements)[..., None]], axis=-1)
-
-    model = PolyNetwork(n_features=n_features)
-
     calc_mode = False
     cross_val_mode = False
     cv_splits = 4
+    visualize_steps = False
+    poly_grid = [1, 2, 4]
+    alpha_grid = [0, 0.01, 0.5]
 
-    if calc_mode:
-        # init
-        pred = model.forward(X)
-        visualize_decision(X_origin, y, pred, name='init')
+    # poly_grid = [3]
+    # alpha_grid = [0.0]
 
-        # calc weights
-        model.calc_weights(X, y)
-        pred = model.forward(X)
-        visualize_decision(X_origin, y, pred, name='calc_weights')
+    for poly_degree in poly_grid:
+        for alpha in alpha_grid:
 
-        # calc weights
-        model.calc_weights(X, y, alpha=0.5)
-        pred = model.forward(X)
-        visualize_decision(X_origin, y, pred, name='calc_weights_reg')
-    else:
+            params = f'Use poly {poly_degree}, alpha: {alpha}'
 
-        if cross_val_mode:
-            for fold_i, (val_fold, train_fold) in enumerate(
-                    kfold((X, y), n_splits=cv_splits)
-            ):
-                model = PolyNetwork(n_features=n_features)
-                print('Fold index:', fold_i)
-                X_fold, y_fold = train_fold
-                visualize_decision(X_fold[:, 0], y_fold, y_fold, name='fold_data')
-                model.optimize(X_origin, X_fold, y_fold, steps=20000, lr=0.005, alpha=0.0, vis=False)
+            # n_elements x n_features
+            X = create_polynomial_features(X_origin, degree=poly_degree)
+            n_features = X.shape[-1]
+            n_elements = X.shape[0]
 
+            # add bias ones term
+            X = np.concatenate([X, np.ones(n_elements)[..., None]], axis=-1)
+            model = PolyNetwork(n_features=n_features)
+
+            if calc_mode:
+                # init
                 pred = model.forward(X)
-                visualize_decision(X_origin, y, pred, name='optimize')
+                visualize_decision(X_origin, y, pred, name='init')
 
-        else:
-            model.optimize(X_origin, X, y, steps=20000, lr=0.005, alpha=0.0)
+                # calc weights
+                model.calc_weights(X, y)
+                pred = model.forward(X)
+                visualize_decision(X_origin, y, pred, name='calc_weights')
+
+                # calc weights
+                model.calc_weights(X, y, alpha=alpha)
+                pred = model.forward(X)
+                visualize_decision(X_origin, y, pred, name='calc_weights_reg')
+            else:
+
+                if cross_val_mode:
+                    for fold_i, (val_fold, train_fold) in enumerate(
+                            kfold((X, y), n_splits=cv_splits)
+                    ):
+                        model = PolyNetwork(n_features=n_features)
+                        print('Fold index:', fold_i)
+                        X_fold, y_fold = train_fold
+                        visualize_decision(X_fold[:, 0], y_fold, y_fold, name='fold_data')
+                        model.optimize(X_origin, X_fold, y_fold, steps=20000, lr=0.005, alpha=alpha, vis=False)
+
+                        pred = model.forward(X)
+                        visualize_decision(X_origin, y, pred, name='optimize')
+
+                else:
+                    model.optimize(X_origin, X, y, steps=20000, lr=0.005, alpha=alpha, vis=visualize_steps)
+                    pred = model.forward(X)
+                    visualize_decision(X_origin, y, pred, name='optimize', params=params)
