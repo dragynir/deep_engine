@@ -7,6 +7,8 @@ from sklearn.datasets import load_digits
 from sklearn.model_selection import train_test_split
 import warnings
 from tqdm import tqdm
+from mpl_toolkits.axes_grid1 import ImageGrid
+
 
 warnings.filterwarnings("ignore")
 
@@ -67,8 +69,8 @@ if __name__ == "__main__":
         shuffle=True,
     )
 
-    print('Train:', X_train.shape)
-    print('Test:', X_test.shape)
+    print("Train:", X_train.shape)
+    print("Test:", X_test.shape)
     print(Counter(y_test))
 
     metric = l2_distance
@@ -76,14 +78,27 @@ if __name__ == "__main__":
 
     plt.figure()
     plt.imshow(X_test[0].reshape((8, 8)))
-    X_test = add_noise(X_test, noise_type='normal', noise_level=3)
+    # add noise
+    # X_test = add_noise(X_test, noise_type="normal", noise_level=3)
     plt.figure()
     plt.imshow(X_test[0].reshape((8, 8)))
+    plt.show()
+
+    fig = plt.figure(figsize=(4.0, 4.0))
+    grid = ImageGrid(
+        fig,
+        111,
+        nrows_ncols=(2, 2),
+        axes_pad=0.1,
+    )
+
+    for ax, im in zip(grid, X_test[56:60]):
+        ax.imshow(im.reshape((8, 8)))
     plt.show()
 
     correct_count = 0
     for x, y in tqdm(zip(X_test, y_test)):
         y_pred = knn.predict(X_train, y_train, x, metric=metric, k=K)
-        correct_count += (y_pred == y)
+        correct_count += y_pred == y
 
-    print('Accuracy: ', correct_count / len(y_test))
+    print("Accuracy: ", correct_count / len(y_test))
