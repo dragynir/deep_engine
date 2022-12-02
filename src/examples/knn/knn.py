@@ -22,6 +22,10 @@ def l2_distance(v1, v2):
 
 
 class SimpleKNN:
+
+    def __init__(self, acc_size):
+        self.acc = np.zeros(acc_size)
+
     def predict(self, inputs, labels, datapoint, metric=l2_distance, k=4):
         """
         :param inputs: обучающие примеры
@@ -29,12 +33,24 @@ class SimpleKNN:
         :param datapoint: пример для предикта
         :pram k: кол-во соседей
         """
+        indices = np.array(range(len(inputs)))
         distances = np.array(tuple(metric(datapoint, d) for d in inputs))
         sort_ind = np.argsort(distances)
+
+        labels_ind = indices[sort_ind]
         labels = labels[sort_ind]
         top_k = labels[:k]
+        labels_ind = labels_ind[:k]
+
+        self.acc[labels_ind] += 1
         majority_class = Counter(top_k)
         return majority_class.most_common(1).pop()[0]
+
+    def get_outliers(self, k=4):
+        plt.hist(self.acc)
+        plt.title('Сколько раз сэмпл был соседом других сэмплов.')
+        plt.show()
+        return np.argwhere(self.acc < k)
 
 
 def add_noise(x, noise_type, noise_level=1):
@@ -48,8 +64,6 @@ def add_noise(x, noise_type, noise_level=1):
 
 
 if __name__ == "__main__":
-    knn = SimpleKNN()
-
     digits = load_digits()
     images = digits.images
     labels = digits.target
@@ -75,6 +89,7 @@ if __name__ == "__main__":
 
     metric = l2_distance
     K = 4
+    outliers_k = 3
     find_outliers = True
 
     plt.figure()
@@ -98,22 +113,33 @@ if __name__ == "__main__":
     plt.show()
 
     if not find_outliers:
+        knn = SimpleKNN(len(X_train))
         correct_count = 0
         for x, y in tqdm(zip(X_test, y_test)):
             y_pred = knn.predict(X_train, y_train, x, metric=metric, k=K)
             correct_count += y_pred == y
         print("Accuracy: ", correct_count / len(y_test))
     else:
+        knn = SimpleKNN(len(X_train))
         outliers = []
         for ind, (x, y) in tqdm(enumerate(zip(X_train, y_train))):
             y_pred = knn.predict(X_train, y_train, x, metric=metric, k=K)
             if y_pred != y:
                 outliers.append(ind)
 
-        print(f'Found {len(outliers)}')
+        print(f'Found simple {len(outliers)} outliers.')
 
-        for i in outliers:
-            plt.figure()
-            plt.title(y_train[i])
-            plt.imshow(X_train[i].reshape((8, 8)))
-        plt.show()
+        odin_outliers = knn.get_outliers(k=outliers_k)
+        print(f'Found odin {len(odin_outliers)} outliers')
+
+        # for i in outliers:
+        #     plt.figure()
+        #     plt.title(y_train[i])
+        #     plt.imshow(X_train[i].reshape((8, 8)))
+        # plt.show()
+
+        # for i in odin_outliers:
+        #     plt.figure()
+        #     plt.title(y_train[i])
+        #     plt.imshow(X_train[i].reshape((8, 8)))
+        # plt.show()
