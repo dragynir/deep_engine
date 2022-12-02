@@ -75,6 +75,7 @@ if __name__ == "__main__":
 
     metric = l2_distance
     K = 4
+    find_outliers = True
 
     plt.figure()
     plt.imshow(X_test[0].reshape((8, 8)))
@@ -96,9 +97,23 @@ if __name__ == "__main__":
         ax.imshow(im.reshape((8, 8)))
     plt.show()
 
-    correct_count = 0
-    for x, y in tqdm(zip(X_test, y_test)):
-        y_pred = knn.predict(X_train, y_train, x, metric=metric, k=K)
-        correct_count += y_pred == y
+    if not find_outliers:
+        correct_count = 0
+        for x, y in tqdm(zip(X_test, y_test)):
+            y_pred = knn.predict(X_train, y_train, x, metric=metric, k=K)
+            correct_count += y_pred == y
+        print("Accuracy: ", correct_count / len(y_test))
+    else:
+        outliers = []
+        for ind, (x, y) in tqdm(enumerate(zip(X_train, y_train))):
+            y_pred = knn.predict(X_train, y_train, x, metric=metric, k=K)
+            if y_pred != y:
+                outliers.append(ind)
 
-    print("Accuracy: ", correct_count / len(y_test))
+        print(f'Found {len(outliers)}')
+
+        for i in outliers:
+            plt.figure()
+            plt.title(y_train[i])
+            plt.imshow(X_train[i].reshape((8, 8)))
+        plt.show()
